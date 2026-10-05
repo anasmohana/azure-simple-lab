@@ -1,0 +1,93 @@
+name: terraform
+
+on:
+  pull_request:
+    paths: ["terraform/**", ".github/workflows/**"]
+  push:
+    branches: [main]
+    paths: ["terraform/**", ".github/workflows/**"]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # Static checks: no Azure credentials needed
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.11.4"
+      - name: Allow private module repo
+        run: git config --global url."https://x-access-token:${{ secrets.MODULES_READ_TOKEN }}@github.com/".insteadOf "https://github.com/"
+      - run: terraform fmt -check -recursive terraform
+      - name: validate every layer/env
+        run: |
+          for dir in terraform/*/dev terraform/*/prd; do
+            echo "::group::$dir"
+            terraform -chdir=$dir init -backend=false -input=false
+            terraform -chdir=$dir validate
+            echo "::endgroup::"
+          done
+      - name: checkov (IaC security scan)
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: terraform
+          framework: terraform
+          soft_fail: true # report-only in the lab; flip once findings are triaged
+
+  # PR: plan every layer. Layers that depend on an upstream layer not yet applied will
+  # fail to read it (expected on the very first run), so they don't block each other.
+  plan:
+    if: github.event_name == 'pull_request'
+    needs: static
+    strategy:
+      fail-fast: false
+      matrix:
+        layer: [bootstrap, network, runner, aks, aks-bootstrap]
+        env: [dev, prd]
+    uses: ./.github/workflows/layer.yml
+    with:
+      layer: ${{ matrix.layer }}
+      env: ${{ matrix.env }}
+      mode: plan
+    secrets: inherit
+
+  # main: apply layers in dependency order, one at a time. dev first, prd after approval.
+  apply-dev:
+    if: github.event_name == 'push'
+    needs: static
+    strategy:
+      max-parallel: 1
+      matrix:
+        layer: [bootstrap, network, runner, aks, aks-bootstrap]
+    uses: ./.github/workflows/layer.yml
+    with:
+      layer: ${{ matrix.layer }}
+      env: dev
+      mode: apply
+    secrets: inherit
+
+  # One approval for the whole prd rollout (reviewers configured on this environment)
+  approve-prd:
+    if: github.event_name == 'push'
+    needs: apply-dev
+    runs-on: ubuntu-latest
+    environment: prd-approval
+    steps:
+      - run: echo "prd rollout approved"
+
+  apply-prd:
+    needs: approve-prd
+    strategy:
+      max-parallel: 1
+      matrix:
+        layer: [bootstrap, network, runner, aks, aks-bootstrap]
+    uses: ./.github/workflows/layer.yml
+    with:
+      layer: ${{ matrix.layer }}
+      env: prd
+      mode: apply
+    secrets: inherit

@@ -1,0 +1,10 @@
+#cloud-config
+# Installs tooling only. Registration with GitHub uses a short-lived registration token
+# fetched at provisioning time (never baked into the image or state).
+package_update: true
+packages: [curl, jq, unzip, git, docker.io]
+runcmd:
+  - curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+  - curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp.gpg
+  - echo "deb [signed-by=/usr/share/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com jammy main" > /etc/apt/sources.list.d/hashicorp.list
+  - apt-get update && apt-get install -y terraform

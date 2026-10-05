@@ -1,0 +1,8 @@
+# Pod -> Azure with no secrets: ServiceAccount is federated to a user-assigned managed identity
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: api
+  namespace: app
+  annotations:
+    azure.workload.identity/client-id: "<uami-client-id>"  # output of the identity module

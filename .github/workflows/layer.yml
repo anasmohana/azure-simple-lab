@@ -1,0 +1,56 @@
+name: layer
+
+# Reusable: runs ONE Terraform layer in ONE environment, either plan-only or plan+apply.
+on:
+  workflow_call:
+    inputs:
+      layer: {required: true, type: string}
+      env:   {required: true, type: string}
+      mode:  {required: true, type: string} # plan | apply
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    # plan jobs use <env>-plan (read-only intent); apply jobs use <env>. Each has its own
+    # federated credential subject, so a plan job's token can't be replayed as an apply.
+    environment: ${{ inputs.mode == 'plan' && format('{0}-plan', inputs.env) || inputs.env }}
+    concurrency: tf-${{ inputs.layer }}-${{ inputs.env }} # never two runs against one state
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
+      TF_IN_AUTOMATION: "true"
+      WORKDIR: terraform/${{ inputs.layer }}/${{ inputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.11.4"
+      - name: Allow private module repo
+        run: git config --global url."https://x-access-token:${{ secrets.MODULES_READ_TOKEN }}@github.com/".insteadOf "https://github.com/"
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: init
+        run: |
+          terraform -chdir=$WORKDIR init -input=false \
+            -backend-config="resource_group_name=${{ vars.TFSTATE_RG }}" \
+            -backend-config="storage_account_name=${{ vars.TFSTATE_SA }}"
+      - name: plan
+        run: terraform -chdir=$WORKDIR plan -input=false -lock-timeout=5m -out=tfplan
+      - name: plan summary
+        run: |
+          terraform -chdir=$WORKDIR show -no-color tfplan > plan.txt
+          { echo "### ${{ inputs.layer }} / ${{ inputs.env }}"; echo '```'; tail -c 60000 plan.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      # Apply re-plans right before applying so a stale plan can never be applied
+      - name: apply
+        if: inputs.mode == 'apply'
+        run: terraform -chdir=$WORKDIR apply -input=false -lock-timeout=5m tfplan

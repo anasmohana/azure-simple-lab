@@ -1,0 +1,24 @@
+# Default deny, then open only what the app needs
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny, namespace: app}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-ingress-from-controller-and-dns, namespace: app}
+spec:
+  podSelector: {matchLabels: {app: api}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: ingress}}
+      ports: [{port: 8080}]
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+      ports: [{port: 53, protocol: UDP}]
+    - to: [{ipBlock: {cidr: 0.0.0.0/0}}]  # tighten to Private Endpoint CIDRs (Key Vault / Storage)
+      ports: [{port: 443}]
