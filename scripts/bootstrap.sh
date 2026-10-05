@@ -7,7 +7,7 @@ set -euo pipefail
 
 : "${GITHUB_REPO:?set GITHUB_REPO=owner/repo}"
 : "${ALERT_EMAIL:?set ALERT_EMAIL}"
-LOCATION="${LOCATION:-westeurope}"
+LOCATION="${LOCATION:-norwayeast}"
 SUB_ID="$(az account show --query id -o tsv)"
 TENANT_ID="$(az account show --query tenantId -o tsv)"
 SUFFIX="$(echo -n "$SUB_ID" | md5 2>/dev/null | cut -c1-5 || echo -n "$SUB_ID" | md5sum | cut -c1-5)"

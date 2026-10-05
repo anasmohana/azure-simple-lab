@@ -5,7 +5,7 @@ variable "environment" {
 
 variable "location_name" {
   type    = string
-  default = "westeurope"
+  default = "norwayeast"
 }
 
 variable "prefix" {
