@@ -1,0 +1,27 @@
+name: azure-bootstrap
+run-name: "azure-bootstrap · ${{ inputs.environment }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prd
+      target_flags:
+        description: "Optional -target flags for a phase-1 apply. Leave empty for full apply."
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  run-terraform:
+    uses: ./.github/workflows/terraform-workflow-template.yml
+    with:
+      layer: bootstrap
+      environment: ${{ inputs.environment }}
+      target_flags: ${{ inputs.target_flags }}
+    secrets: inherit

@@ -1,0 +1,27 @@
+name: azure-network
+run-name: "azure-network · ${{ inputs.environment }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prd
+      plan_vars:
+        description: "Optional -var flags (e.g. -var enabled=true to deploy a code-only layer)."
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  run-terraform:
+    uses: ./.github/workflows/terraform-workflow-template.yml
+    with:
+      layer: network
+      environment: ${{ inputs.environment }}
+      plan_vars: ${{ inputs.plan_vars }}
+    secrets: inherit

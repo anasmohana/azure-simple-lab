@@ -49,7 +49,7 @@ az role assignment create --assignee "$APP_ID" --role Contributor --scope "/subs
 az role assignment create --assignee "$APP_ID" --role "Storage Blob Data Owner" --scope "$SA_ID" -o none || true
 
 echo "==> GitHub environments + variables"
-gh api -X PUT "repos/$GITHUB_REPO/environments/prd-approval" -i >/dev/null  # approval gate only, no Azure access
+for E in dev-approval prd-approval; do gh api -X PUT "repos/$GITHUB_REPO/environments/$E" -i >/dev/null; done  # approval gates only, no Azure access
 for E in dev dev-plan prd prd-plan; do
   gh api -X PUT "repos/$GITHUB_REPO/environments/$E" -i >/dev/null
   gh variable set AZURE_CLIENT_ID       --env "$E" --repo "$GITHUB_REPO" --body "$APP_ID"
@@ -65,6 +65,6 @@ cat <<MSG
 Done. Manual steps left:
   1. Repo secret MODULES_READ_TOKEN: fine-grained PAT with read-only 'Contents' on anasmohana/terraform-modules
        gh secret set MODULES_READ_TOKEN --repo $GITHUB_REPO
-  2. GitHub > Settings > Environments > prd-approval: add 'Required reviewers' (the single approval gate for the whole prd rollout).
+  2. GitHub > Settings > Environments > prd-approval: add 'Required reviewers' (the approval gate before any prd apply).
   3. Protect 'main' (PR + status checks required).
 MSG

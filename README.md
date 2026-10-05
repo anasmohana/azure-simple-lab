@@ -28,7 +28,7 @@ find each other by name through data sources (no cross-state coupling). Apply or
 ```
 terraform/<layer>/common/   the layer's code (variables, local.*.tf config, main.tf, outputs)
 terraform/<layer>/dev|prd/  thin roots: env inputs, provider pin, backend (key = <layer>-<env>.tfstate)
-.github/workflows/          terraform.yml (orchestration), layer.yml (reusable: one layer, one env)
+.github/workflows/          azure-<layer>.yml (dispatch per layer), terraform-workflow-template.yml, terraform-checks.yml
 scripts/bootstrap.sh        one-time: state storage, Entra app + federated creds, GitHub environments
 k8s/  terraform/design-aks.md   in-cluster manifests and AKS design notes
 docs/                       SRE, review findings, interview script
@@ -37,9 +37,11 @@ docs/                       SRE, review findings, interview script
 Reusable modules live in a separate repo (`anasmohana/terraform-modules`) and are
 **pinned to a commit SHA**; bumping a module is a reviewed PR.
 
-Pipeline: PR runs fmt/validate/checkov, then a plan for every layer x env. Merge to main applies
-dev layer by layer, then waits for one approval (`prd-approval`), then applies prd layer by layer.
-To turn on a code-only layer, flip `enabled = true` in its env root and merge.
+Pipeline: a PR runs fmt/validate/checkov (`terraform-checks.yml`). Each layer has its own manual
+workflow (`azure-<layer>.yml`, pick `dev` or `prd`) that calls `terraform-workflow-template.yml`:
+**plan -> approval (`<env>-approval` environment) -> apply of that exact plan**, authenticated by OIDC.
+Run them in layer order. To turn on a code-only layer, run its workflow with `plan_vars: -var enabled=true`
+(or flip `enabled` in the env root and merge).
 
 ## Cost
 
