@@ -32,14 +32,19 @@ APP_ID="$(az ad app list --display-name lab-github-terraform --query '[0].appId'
 if [ -z "$APP_ID" ]; then APP_ID="$(az ad app create --display-name lab-github-terraform --query appId -o tsv)"; fi
 az ad sp show --id "$APP_ID" >/dev/null 2>&1 || az ad sp create --id "$APP_ID" -o none
 APP_OBJ="$(az ad app show --id "$APP_ID" --query id -o tsv)"
+# Newer GitHub accounts/orgs issue immutable-ID subjects (owner@id/repo@id) instead of names.
+OWNER="${GITHUB_REPO%%/*}"; REPO_NAME="${GITHUB_REPO##*/}"
+OWNER_ID="$(gh api "repos/$GITHUB_REPO" --jq .owner.id)"; REPO_ID="$(gh api "repos/$GITHUB_REPO" --jq .id)"
+SUBJECT_PREFIX="repo:${OWNER}@${OWNER_ID}/${REPO_NAME}@${REPO_ID}"
 
 # One federated credential per GitHub Environment: the token subject is pinned to
 # repo + environment, so a fork/branch/other workflow can't mint a usable token.
 for E in dev-plan prd-plan dev prd; do
+  az ad app federated-credential delete --id "$APP_OBJ" --federated-credential-id "gh-$E" 2>/dev/null || true
   az ad app federated-credential create --id "$APP_OBJ" --parameters "{
     \"name\": \"gh-$E\",
     \"issuer\": \"https://token.actions.githubusercontent.com\",
-    \"subject\": \"repo:${GITHUB_REPO}:environment:${E}\",
+    \"subject\": \"${SUBJECT_PREFIX}:environment:${E}\",
     \"audiences\": [\"api://AzureADTokenExchange\"]}" -o none 2>/dev/null || true
 done
 
