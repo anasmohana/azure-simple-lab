@@ -1,59 +1,91 @@
 # azure-simple-lab
 
-A small, cheap Azure lab that demonstrates the pattern I use in production:
-**Terraform code → GitHub Actions (OIDC, plan, approval, apply) → real Azure resources.**
+A small, low-cost Azure lab that demonstrates the delivery pattern I use in production:
+
+**Terraform in layers → GitHub Actions (OIDC, plan, approval, apply) → real Azure resources.**
 
 ```
-GitHub PR ─► fmt / validate / checkov ─► plan (dev, prd) ─► merge to main
-                                                              │
-                              apply dev ──► [approval] ──► apply prd
-                                   │ OIDC federated credential, no stored secrets
-                                   ▼
-                               Azure subscription
+PR ──► fmt / validate / checkov
+manual dispatch per layer ──► plan ──► approval (environment gate) ──► apply that exact plan
+                                  │ GitHub OIDC federated credential, no stored Azure secrets
+                                  ▼
+                            Azure subscription
 ```
 
-## Layers
+## Status
 
-Each layer is its own Terraform stack with its own state file per environment, and layers
-find each other by name through data sources (no cross-state coupling). Apply order top to bottom.
-
-| # | Layer | What it owns | Deployed in lab |
+| Layer | What it owns | `dev` | `prd` |
 |---|---|---|---|
-| 1 | `bootstrap` | resource group, Log Analytics, storage, Key Vault, action group + alert | yes |
-| 2 | `network` | VNet, NSGs, route table, subnets (runner / pep / aks), private DNS zones | yes |
-| 3 | `runner` | private self-hosted CI runner VM | code only (`enabled = false`) |
-| 4 | `aks` | private, Entra-integrated AKS (system + user pools, zones, autoscaling) | code only (`enabled = false`) |
-| 5 | `aks-bootstrap` | federated workload identities + Key Vault RBAC for pods; GitOps handles `/k8s` | code only (`enabled = false`) |
+| 1 `bootstrap` | resource group, Log Analytics, storage, Key Vault, action group + availability alert | **deployed** | code only |
+| 2 `network` | VNet, 2 NSGs, route table, 3 subnets (runner / pep / aks), private DNS zones | **deployed** | code only |
+| 3 `runner` | private self-hosted CI runner VM | code only (`enabled=false`) | code only |
+| 4 `aks` | Entra-integrated AKS, system + user pools, 3 zones, autoscaling | code only (`enabled=false`) | code only |
+| 5 `aks-bootstrap` | federated workload identities + Key Vault RBAC for pods | code only (`enabled=false`) | code only |
+
+Only `dev` is deployed, to keep the lab cheap. `prd` has the same code with different inputs
+(address space, GRS storage, purge protection, larger AKS minimums) and sits behind its own approval gate.
+Code-only layers still plan cleanly (`No changes`), and `aks` / `runner` were plan-tested with
+`enabled=true` (3 resources each) without applying.
+
+Region: `norwayeast` (westeurope was not accepting new customers on the subscription).
+
+## Repository layout
 
 ```
-terraform/<layer>/common/   the layer's code (variables, local.*.tf config, main.tf, outputs)
-terraform/<layer>/dev|prd/  thin roots: env inputs, provider pin, backend (key = <layer>-<env>.tfstate)
-.github/workflows/          azure-<layer>.yml (dispatch per layer), terraform-workflow-template.yml, terraform-checks.yml
-scripts/bootstrap.sh        one-time: state storage, Entra app + federated creds, GitHub environments
-k8s/  terraform/design-aks.md   in-cluster manifests and AKS design notes
-docs/                       SRE, review findings, interview script
+terraform/<layer>/common/    the layer's code: variables, local.*.tf config, main.tf, outputs
+terraform/<layer>/dev|prd/   thin roots: env inputs, provider pin, backend (state key <layer>-<env>.tfstate)
+.github/workflows/
+  azure-<layer>.yml          manual dispatch per layer (choose dev | prd)
+  terraform-workflow-template.yml   reusable: plan -> approval -> apply
+  terraform-checks.yml       PR gate: fmt, validate every root, checkov (report-only)
+scripts/bootstrap.sh         one-time: state storage, Entra app + federated credentials, GitHub environments
+k8s/                         in-cluster manifests (namespace, NetworkPolicy, RBAC, workload identity, PDB/HPA)
+docs/                        runbook, SRE, review findings, interview script
+terraform/design-aks.md      AKS design decisions
 ```
 
-Reusable modules live in a separate repo (`anasmohana/terraform-modules`) and are
-**pinned to a commit SHA**; bumping a module is a reviewed PR.
+## How it fits together
 
-Pipeline: a PR runs fmt/validate/checkov (`terraform-checks.yml`). Each layer has its own manual
-workflow (`azure-<layer>.yml`, pick `dev` or `prd`) that calls `terraform-workflow-template.yml`:
-**plan -> approval (`<env>-approval` environment) -> apply of that exact plan**, authenticated by OIDC.
-Run them in layer order. To turn on a code-only layer, run its workflow with `plan_vars: -var enabled=true`
-(plus `-var authorized_ip_ranges=[...]` for AKS, `-var admin_ssh_public_key=...` for the runner).
+- **Layers, not one big stack.** Each layer has its own state file per environment. Layers find each
+  other by resource name through data sources, not by reading each other's state, so each can be
+  planned and applied independently. Apply order: bootstrap, network, runner, aks, aks-bootstrap.
+- **Modules** come from a separate, private repo (`anasmohana/terraform-modules`) and are pinned to a
+  commit SHA. Bumping a module is a reviewed change. Resources are described with settings objects
+  (`local.*.tf`), so adding a subnet or storage account is a data change, not new code.
+- **Authentication:** GitHub issues a short-lived OIDC token per job. Azure trusts only the exact
+  repo + environment subject (`<env>-plan` for plans, `<env>` for applies), so a plan token cannot be
+  replayed as an apply. No client secrets exist. The only secret is a read-only token for the module repo.
+- **Approval:** the apply job needs `<env>-approval`. `prd-approval` has required reviewers; `dev-approval` does not.
+  Apply uses the saved plan file and the plan job's provider lock file, so it applies exactly what was reviewed.
+- **State:** Azure Storage, versioned with soft delete, Entra auth only (no keys), blob-lease locking,
+  one state file per layer per environment. Concurrency groups prevent two applies on one state.
 
-## Cost
+## Security posture in the lab (and what I would change for production)
 
-Deployed layers are a few cents/day per environment (Log Analytics capped at 0.5 GB/day,
-LRS storage, no VMs, no cluster).
+In the lab: default-deny NSGs, storage with no shared keys / no public blobs / TLS 1.2 / versioning,
+Key Vault with RBAC and diagnostics to Log Analytics, deny-by-default firewalls, OIDC, pinned
+provider and module versions, Log Analytics daily cap.
+
+Deliberately not done: private endpoints, Azure Firewall, private AKS API. They would need a private
+runner and extra cost. See `docs/REVIEW-FINDINGS.md` for what I would do in production.
 
 ## Run it
+
+Prerequisites: an Azure subscription you own, `az`, `gh`, Terraform. Full steps in `docs/RUNBOOK.md`.
 
 ```bash
 az login
 GITHUB_REPO=<owner>/azure-simple-lab ALERT_EMAIL=you@example.com ./scripts/bootstrap.sh
-# then add MODULES_READ_TOKEN secret and required reviewers on the `prd` environment
+gh secret set MODULES_READ_TOKEN --repo <owner>/azure-simple-lab   # read-only token for the modules repo
+# add required reviewers on the prd-approval environment, protect main
+# then: Actions -> azure-bootstrap -> Run workflow -> dev, then azure-network, ...
 ```
 
-Tear down: run `terraform destroy` per env (dev has purge protection off for this reason).
+To turn on a code-only layer, run its workflow with `plan_vars` (for example `-var enabled=true`;
+AKS also takes `-var 'authorized_ip_ranges=["<your-ip>/32"]'`, the runner `-var admin_ssh_public_key=...`).
+
+## Cost
+
+Deployed layers cost cents per day: Log Analytics is capped at 0.5 GB/day, storage is LRS in dev,
+and there are no VMs or clusters running. Tear down with `terraform destroy` per layer in reverse order
+(or delete `lab-dev-net-rg` and `lab-dev-rg`).

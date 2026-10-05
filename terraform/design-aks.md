@@ -1,19 +1,21 @@
-# AKS design (not deployed)
+# AKS design
 
-Code lives in the `aks` and `aks-bootstrap` layers (`enabled = false`). Not provisioned: no reason to pay for a running cluster in a lab. This is the shape I'd deploy
-via the shared `aks` module, in the `aks` subnet of the platform VNet.
+Code lives in the `aks` and `aks-bootstrap` layers and is off by default (`enabled = false`). It plan-tests
+cleanly with `-var enabled=true`. It is not deployed: no reason to pay for an idle cluster in a lab.
 
-| Concern | Decision |
-|---|---|
-| Cluster | Private API server, Azure CNI Overlay, Entra ID auth + Azure RBAC for Kubernetes, local accounts disabled |
-| Node pools | `system` (3 nodes, zones 1-3, tainted CriticalAddonsOnly) + `user` pool autoscaled 3-12, zones 1-3 |
-| Identity | OIDC issuer + Workload Identity; pods use federated user-assigned managed identities, never secrets |
-| Secrets | Key Vault via CSI driver (RBAC auth), secrets never in manifests/state |
-| Network | NetworkPolicy default-deny per namespace, egress via firewall/NAT, ingress via App Gateway for Containers or ingress-nginx |
-| Upgrades | Auto-upgrade channel `patch`, node image `NodeImage`, maintenance window, PDBs on every service; dev first, then prd |
-| Scaling | HPA on pods, cluster autoscaler on nodes, resource requests mandatory (ResourceQuota/LimitRange) |
-| Policy | Azure Policy add-on / Pod Security `restricted`, image allowlist (ACR only) |
-| Observability | Managed Prometheus + Managed Grafana, Container Insights logs to Log Analytics (see docs/SRE.md) |
-| Delivery | GitOps (Flux) pulling `k8s/`; CI never has kubectl credentials |
+| Concern | Lab code | Production design |
+|---|---|---|
+| API server | public, restricted by `authorized_ip_ranges` | private cluster, reached from a private runner / jump host |
+| Identity | Entra ID + Azure RBAC for Kubernetes, local accounts disabled | same; admin groups from Entra, break-glass process |
+| Node pools | `system` (critical addons only) + `user`, zones 1-3, autoscaling | system pool 3 nodes, user pools per workload class, spot only for tolerant jobs |
+| Networking | Azure CNI, Calico NetworkPolicy, own `aks` subnet with NSG | default-deny per namespace, controlled egress via firewall/NAT, ingress via App Gateway or ingress-nginx |
+| Workload identity | OIDC issuer + workload identity; `aks-bootstrap` creates federated identities with Key Vault Secrets User | same, one identity per service, least privilege |
+| Secrets | Key Vault CSI driver with rotation | same; no secrets in manifests, state or CI |
+| Upgrades | auto-upgrade channel `patch`, node OS channel `NodeImage`, surge 33% | maintenance windows, PodDisruptionBudgets on every service, dev first then prd |
+| Scaling | cluster autoscaler + HPA (`k8s/30-availability.yaml`) | requests/limits enforced by quota and LimitRange |
+| Policy | Azure Policy add-on, Pod Security `restricted` on the namespace | image allowlist (ACR only), signed images |
+| Observability | Container Insights to Log Analytics | Managed Prometheus + Grafana, SLO burn-rate alerts (see `docs/SRE.md`) |
+| Delivery | manifests in `/k8s` | GitOps (Flux) pulls from Git; CI has no cluster credentials |
 
-Sample manifests for namespaces, NetworkPolicy, workload identity, PDB/HPA and RBAC are in `/k8s`.
+Sample manifests: namespace and quota, default-deny NetworkPolicy, RBAC binding, workload identity
+ServiceAccount, PDB and HPA are in `/k8s`.
