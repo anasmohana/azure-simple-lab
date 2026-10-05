@@ -1,22 +1,26 @@
 locals {
   clusters = {
     main = {
-      name                       = local.aks_name
-      location                   = var.location_name
-      resource_group_name        = local.resource_group_name
-      kubernetes_version         = var.kubernetes_version
-      sku_tier                   = var.environment == "prd" ? "Standard" : "Free"
-      dns_prefix_private_cluster = local.aks_name
-      private_cluster_enabled    = true
-      oidc_issuer_enabled        = true
-      workload_identity_enabled  = true
-      azure_policy_enabled       = true
-      local_account_disabled     = true # no static admin kubeconfig
-      run_command_enabled        = false
-      image_cleaner_enabled      = true
+      name                      = local.aks_name
+      location                  = var.location_name
+      resource_group_name       = local.resource_group_name
+      kubernetes_version        = var.kubernetes_version
+      sku_tier                  = var.environment == "prd" ? "Standard" : "Free"
+      dns_prefix                = local.aks_name
+      private_cluster_enabled   = false # lab: public API restricted by IP; prod: true + private runner
+      oidc_issuer_enabled       = true
+      workload_identity_enabled = true
+      azure_policy_enabled      = true
+      local_account_disabled    = true # no static admin kubeconfig
+      run_command_enabled       = false
+      image_cleaner_enabled     = true
 
       automatic_upgrade_channel = "patch"
       node_os_upgrade_channel   = "NodeImage"
+
+      api_server_access_profile = length(var.authorized_ip_ranges) > 0 ? {
+        authorized_ip_ranges = var.authorized_ip_ranges
+      } : null
 
       identity = {
         type = "SystemAssigned"

@@ -14,3 +14,9 @@ variable "admin_group_object_ids" {
   type        = list(string)
   default     = []
 }
+
+variable "authorized_ip_ranges" {
+  description = "CIDRs allowed to reach the public API server, e.g. [\"203.0.113.7/32\"]. Empty = unrestricted (not for prod)."
+  type        = list(string)
+  default     = []
+}

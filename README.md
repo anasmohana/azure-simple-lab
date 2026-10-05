@@ -41,7 +41,7 @@ Pipeline: a PR runs fmt/validate/checkov (`terraform-checks.yml`). Each layer ha
 workflow (`azure-<layer>.yml`, pick `dev` or `prd`) that calls `terraform-workflow-template.yml`:
 **plan -> approval (`<env>-approval` environment) -> apply of that exact plan**, authenticated by OIDC.
 Run them in layer order. To turn on a code-only layer, run its workflow with `plan_vars: -var enabled=true`
-(or flip `enabled` in the env root and merge).
+(plus `-var authorized_ip_ranges=[...]` for AKS, `-var admin_ssh_public_key=...` for the runner).
 
 ## Cost
 

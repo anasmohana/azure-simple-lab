@@ -2,7 +2,7 @@ module "aks_bootstrap" {
   source = "../common"
 
   environment = "dev"
-  enabled     = false # flip to true to deploy this layer
+  enabled     = var.enabled
 
   tags = {
     project = "azure-simple-lab"
@@ -10,3 +10,9 @@ module "aks_bootstrap" {
   }
 }
 
+
+variable "enabled" {
+  description = "Deploy this layer. Off by default; the pipeline can pass -var enabled=true."
+  type        = bool
+  default     = false
+}
