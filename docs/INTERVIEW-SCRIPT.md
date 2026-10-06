@@ -16,7 +16,15 @@ Opening line: "This is a lab I implemented myself to show the same patterns I us
 3. `aks-bootstrap` then creates a federated user-assigned identity for the `website` service account and grants it that
    one role on the Key Vault (verify in the portal: identity `lab-dev-website-wi`, role Key Vault Secrets User on the vault only).
    A pod using that service account can read secrets with no stored credential, and CI can never grant broader rights.
-   Be precise: the demo site itself does not call Key Vault, the identity and its trust are ready for a workload that does.
+4. Proof it works end to end: the website pod (label `azure.workload.identity/use`, service account `website`) has an init
+   container that swaps its projected token for an Entra token and reads the secret `website-banner`. The page shows the
+   result (`/kv/status.json`). Secret value is a deliberately harmless demo string; the pod egress policy allows only DNS and HTTPS.
+5. Vault stays deny-by-default: bootstrap adds only the AKS subnet (service endpoint) to the firewall (`allow_aks_subnet`).
+   Be precise: the secret was seeded by hand (firewall blocks hosted runners; a self-hosted runner would let Terraform own it),
+   and it is read at pod start, so rotation needs a restart (the CSI driver with rotation is the production answer).
+
+## GitOps demo
+Open a PR in the gitops repo, merge it, and watch the page change within about 3 minutes with no kubectl (tested: PR #1, "v2" banner).
 
 ## Be ready for
 - **"Why not private endpoints / private AKS?"** Cost and demo risk (they need a private runner); the network layer already has the

@@ -6,7 +6,7 @@
 - Action group (email) and a metric alert: storage availability below 99% over 15 min (severity 2).
 
 ## Kubernetes and production design
-Deployed on the dev cluster: Container Insights (logs and metrics to the same Log Analytics workspace) and the Flux
+Deployed on the dev cluster: the website pod reading Key Vault through workload identity, Container Insights (logs and metrics to the same Log Analytics workspace) and the Flux
 status visible through the Azure API. Not deployed, design only: the items below.
 
 - **Metrics:** Azure Managed Prometheus + Managed Grafana (or kube-prometheus-stack). **Logs:** Container Insights / Log Analytics.

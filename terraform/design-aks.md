@@ -9,7 +9,7 @@ Code lives in the `aks` and `aks-bootstrap` layers. In `dev` it is deployed in a
 | Identity | Entra ID + Azure RBAC for Kubernetes, local accounts disabled | same; admin groups from Entra, break-glass process |
 | Node pools | one default pool (workloads share it), autoscaling 1-2, no zones | system pool 3 nodes, user pools per workload class, spot only for tolerant jobs |
 | Networking | Azure CNI, Calico NetworkPolicy, own `aks` subnet with NSG | default-deny per namespace, controlled egress via firewall/NAT, ingress via App Gateway or ingress-nginx |
-| Workload identity | OIDC issuer + workload identity; `aks-bootstrap` creates federated identities with Key Vault Secrets User | same, one identity per service, least privilege |
+| Workload identity | OIDC issuer + workload identity; `aks-bootstrap` creates federated identities with Key Vault Secrets User; the website pod uses it to read a Key Vault secret (vault firewall allows only the AKS subnet) | same, one identity per service, least privilege |
 | Secrets | Key Vault CSI driver with rotation | same; no secrets in manifests, state or CI |
 | Upgrades | auto-upgrade channel `patch`, node OS channel `NodeImage`, surge 33% | maintenance windows, PodDisruptionBudgets on every service, dev first then prd |
 | Scaling | cluster autoscaler (HPA per workload) | requests/limits enforced by quota and LimitRange |
