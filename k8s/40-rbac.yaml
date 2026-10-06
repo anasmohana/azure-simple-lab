@@ -1,7 +1,0 @@
-# Humans get Entra groups -> namespace-scoped roles; no cluster-admin for daily work
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata: {name: app-developers, namespace: app}
-subjects:
-  - {kind: Group, name: "<entra-group-object-id>", apiGroup: rbac.authorization.k8s.io}
-roleRef: {kind: ClusterRole, name: edit, apiGroup: rbac.authorization.k8s.io}

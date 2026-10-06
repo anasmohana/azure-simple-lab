@@ -12,7 +12,7 @@ cleanly with `-var enabled=true`. It is not deployed: no reason to pay for an id
 | Workload identity | OIDC issuer + workload identity; `aks-bootstrap` creates federated identities with Key Vault Secrets User | same, one identity per service, least privilege |
 | Secrets | Key Vault CSI driver with rotation | same; no secrets in manifests, state or CI |
 | Upgrades | auto-upgrade channel `patch`, node OS channel `NodeImage`, surge 33% | maintenance windows, PodDisruptionBudgets on every service, dev first then prd |
-| Scaling | cluster autoscaler + HPA (`k8s/30-availability.yaml`) | requests/limits enforced by quota and LimitRange |
+| Scaling | cluster autoscaler (HPA per workload) | requests/limits enforced by quota and LimitRange |
 | Policy | Azure Policy add-on, Pod Security `restricted` on the namespace | image allowlist (ACR only), signed images |
 | Observability | Container Insights to Log Analytics | Managed Prometheus + Grafana, SLO burn-rate alerts (see `docs/SRE.md`) |
 | Delivery | manifests in `/k8s` | GitOps (Flux) pulls from Git; CI has no cluster credentials |

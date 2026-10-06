@@ -39,7 +39,6 @@ terraform/<layer>/dev|prd/   thin roots: env inputs, provider pin, backend (stat
   terraform-workflow-template.yml   reusable: plan -> approval -> apply
   terraform-checks.yml       PR gate: fmt, validate every root, checkov (report-only)
 scripts/bootstrap.sh         one-time: state storage, Entra app + federated credentials, GitHub environments
-k8s/                         in-cluster manifests (namespace, NetworkPolicy, RBAC, workload identity, PDB/HPA)
 docs/                        runbook, SRE, review findings, interview script
 terraform/design-aks.md      AKS design decisions
 ```
