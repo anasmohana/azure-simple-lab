@@ -38,7 +38,18 @@ so always run a real plan before pushing.
 | `RequestDisallowedByAzure ... location not accepting new customers` | region closed for the subscription | use another region (norwayeast) |
 | AKS `dns_prefix` / `dns_prefix_private_cluster` conflict | module sets `dns_prefix` by default | use `dns_prefix` only |
 | `AuthorizationFailed ... roleAssignments/write` in aks-bootstrap | Contributor cannot create role assignments | conditional RBAC Administrator (Key Vault Secrets User only), see bootstrap.sh |
+| Flux HelmRelease: `secrets is forbidden ... Azure does not have opinion` | on Azure-RBAC clusters the Helm controller identity `<ns>:flux-applier` has no Kubernetes permissions | RoleBinding to `admin` in the chart namespace (gitops repo `rbac.yaml`) |
+| Flux HelmRelease: `attempting to grant RBAC permissions not currently held` | a chart creates Roles/ClusterRoles with rights the applier lacks | `escalate`+`bind` limited by `resourceNames` to the chart's own roles; rendered with `helm template` to find them |
+| Flux stuck, release `Stalled` / health check runs 10 min | failed release has nothing to roll back to; retry waits for the interval | shorter `interval`, `upgrade.remediation.strategy: uninstall`; a spec change in Git triggers a retry |
+| Ingress IP gives HTTP 000 / timeout | AKS subnet NSG denied internet 80/443 | allow rule for 80/443 in the network layer |
+| VM size has quota 0 (`Standard_D*`) | new subscription only has B-series quota | `Standard_B2ms` for the lab cluster (`az vm list-usage -l <region>`) |
 | `-var enabled=true` rejected | root did not declare the variable | roots now declare `enabled` |
+
+## Demo cluster lifecycle
+The AKS cluster costs about $2-3/day. Create it with the `azure-aks` then `azure-aks-bootstrap` workflows (the aks root
+defaults to `enabled = true` in dev; set the `AKS_AUTHORIZED_IPS` environment variable to your public IP as a JSON list,
+for example `["203.0.113.7/32"]`). Destroy it after the demo (`terraform destroy` in `aks-bootstrap/dev`, then `aks/dev`).
+The public IP of the site is the `kubernetes-*` public IP in the `MC_lab-dev-rg_lab-dev-aks_*` resource group.
 
 ## Teardown
 Reverse order: aks-bootstrap, aks, runner, network, bootstrap (`terraform destroy` in each `dev` root),

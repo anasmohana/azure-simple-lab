@@ -19,13 +19,16 @@ manual dispatch per layer ──► plan ──► approval (issue comment) ─�
 | 1 `bootstrap` | resource group, Log Analytics, storage, Key Vault, action group + availability alert | **deployed** | code only |
 | 2 `network` | VNet, 2 NSGs, route table, 3 subnets (runner / pep / aks), private DNS zones | **deployed** | code only |
 | 3 `runner` | private self-hosted CI runner VM | code only (`enabled=false`) | code only |
-| 4 `aks` | Entra-integrated AKS, system + user pools, 3 zones, autoscaling | code only (`enabled=false`) | code only |
-| 5 `aks-bootstrap` | federated workload identities + Key Vault RBAC for pods | code only (`enabled=false`) | code only |
+| 4 `aks` | Entra-integrated AKS: public API restricted to my IP, Calico, workload identity, Container Insights | **deployed, small** (1 node `Standard_B2ms`, Free tier) | code only (production sizing) |
+| 5 `aks-bootstrap` | Flux (GitOps) via the AKS extension, federated pod identity + least-privilege Key Vault role | **deployed** | code only |
 
-Only `dev` is deployed, to keep the lab cheap. `prd` has the same code with different inputs
+Only `dev` is deployed, to keep the lab cheap. The `runner` layer is intentionally not deployed (code only). `prd` has the same code with different inputs
 (address space, GRS storage, purge protection, larger AKS minimums) and goes through the same approval gate.
-Code-only layers still plan cleanly (`No changes`), and `aks` / `runner` were plan-tested with
-`enabled=true` (3 resources each) without applying.
+Code-only layers still plan cleanly, and `runner` was plan-tested with `enabled=true` without applying.
+
+**Live demo:** a small website served from AKS through ingress-nginx (public load balancer), delivered by Flux from the
+public [azure-simple-lab-gitops](https://github.com/anasmohana/azure-simple-lab-gitops) repo. The cluster is
+created for the demo and destroyed afterwards (about $2-3/day while it runs).
 
 Region: `norwayeast` (westeurope was not accepting new customers on the subscription).
 
