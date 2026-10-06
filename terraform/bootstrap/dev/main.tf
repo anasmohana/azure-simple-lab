@@ -8,6 +8,7 @@ module "bootstrap" {
   tags = {
     project = "azure-simple-lab"
     owner   = "platform"
+    demo    = "approval-test"
   }
 }
 
