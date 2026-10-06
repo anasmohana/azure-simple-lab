@@ -10,7 +10,7 @@ locals {
       private_cluster_enabled   = false # lab: public API restricted by IP; prod: true + private runner
       oidc_issuer_enabled       = true
       workload_identity_enabled = true
-      azure_policy_enabled      = true
+      azure_policy_enabled      = var.azure_policy_enabled
       local_account_disabled    = true # no static admin kubeconfig
       run_command_enabled       = false
       image_cleaner_enabled     = true
@@ -51,13 +51,13 @@ locals {
 
       default_node_pool = {
         name                         = "system"
-        vm_size                      = "Standard_D2s_v5"
+        vm_size                      = var.node_vm_size
         vnet_subnet_id               = data.azurerm_subnet.aks.id
-        availability_zones           = ["1", "2", "3"]
+        availability_zones           = length(var.availability_zones) > 0 ? var.availability_zones : null
         auto_scaling_enabled         = true
-        min_count                    = var.environment == "prd" ? 3 : 1
-        max_count                    = 5
-        only_critical_addons_enabled = true
+        min_count                    = var.node_min_count
+        max_count                    = var.node_max_count
+        only_critical_addons_enabled = false # small mode: workloads share the default pool
         os_sku                       = "AzureLinux"
         temporary_name_for_rotation  = "systemtmp"
         upgrade_settings = {
@@ -65,7 +65,7 @@ locals {
         }
       }
 
-      node_pools = {
+      node_pools = var.user_pool_enabled ? {
         user = {
           name                 = "user"
           vm_size              = "Standard_D4s_v5"
@@ -76,7 +76,7 @@ locals {
           max_count            = 12
           os_sku               = "AzureLinux"
         }
-      }
+      } : {}
 
       tags = local.tags
     }

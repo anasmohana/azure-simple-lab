@@ -48,6 +48,17 @@ locals {
         source_address_prefix      = "VirtualNetwork"
         destination_address_prefix = "*"
       }
+      allow_web_in = {
+        name                       = "allow-http-https-in"
+        priority                   = 120
+        direction                  = "Inbound"
+        access                     = "Allow"
+        protocol                   = "Tcp"
+        source_port_range          = "*"
+        destination_port_ranges    = ["80", "443"]
+        source_address_prefix      = "Internet"
+        destination_address_prefix = "*"
+      }
       allow_lb_in = {
         name                       = "allow-azure-lb-in"
         priority                   = 110

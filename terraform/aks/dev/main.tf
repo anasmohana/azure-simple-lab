@@ -13,9 +13,9 @@ module "aks" {
 
 
 variable "enabled" {
-  description = "Deploy this layer. Off by default; the pipeline can pass -var enabled=true."
+  description = "Deploy the cluster."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "authorized_ip_ranges" {

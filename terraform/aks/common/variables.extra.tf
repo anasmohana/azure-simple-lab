@@ -20,3 +20,37 @@ variable "authorized_ip_ranges" {
   type        = list(string)
   default     = []
 }
+
+variable "node_vm_size" {
+  description = "Default pool VM size. Standard_B2ms: 2 vCPU / 8 GB, the cheapest size with quota in the lab subscription."
+  type        = string
+  default     = "Standard_B2ms"
+}
+
+variable "node_min_count" {
+  type    = number
+  default = 1
+}
+
+variable "node_max_count" {
+  type    = number
+  default = 2
+}
+
+variable "availability_zones" {
+  description = "Zones for the default pool. Empty in the lab; [\"1\",\"2\",\"3\"] in production."
+  type        = list(string)
+  default     = []
+}
+
+variable "user_pool_enabled" {
+  description = "Add a separate user node pool. Off in the lab (single default pool)."
+  type        = bool
+  default     = false
+}
+
+variable "azure_policy_enabled" {
+  description = "Azure Policy add-on (extra pods). Off in the small lab cluster."
+  type        = bool
+  default     = false
+}

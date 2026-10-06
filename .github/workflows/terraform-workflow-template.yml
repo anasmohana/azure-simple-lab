@@ -49,6 +49,8 @@ jobs:
       ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
+      # JSON list, e.g. ["203.0.113.7/32"]; only the aks layer declares this variable
+      TF_VAR_authorized_ip_ranges: ${{ vars.AKS_AUTHORIZED_IPS || '[]' }}
     outputs:
       changes: ${{ steps.plan.outputs.changes }}
     steps:

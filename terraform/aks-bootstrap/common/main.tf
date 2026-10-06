@@ -40,3 +40,45 @@ resource "azurerm_role_assignment" "kv_secrets_user" {
   role_definition_name = "Key Vault Secrets User"
   principal_id         = each.value.principal_id
 }
+
+# ---------- GitOps (Flux) ----------
+# Installed as an AKS extension through the Azure API, so CI never needs cluster credentials.
+# Flux then pulls manifests from Git and keeps the cluster in that state.
+resource "azurerm_kubernetes_cluster_extension" "flux" {
+  count          = var.enabled ? 1 : 0
+  name           = "flux"
+  cluster_id     = data.azurerm_kubernetes_cluster.aks[0].id
+  extension_type = "microsoft.flux"
+}
+
+resource "azurerm_kubernetes_flux_configuration" "apps" {
+  count      = var.enabled ? 1 : 0
+  name       = "lab-gitops"
+  cluster_id = data.azurerm_kubernetes_cluster.aks[0].id
+  namespace  = "flux-system"
+  scope      = "cluster"
+
+  git_repository {
+    url                      = var.gitops_repo_url
+    reference_type           = "branch"
+    reference_value          = var.gitops_branch
+    sync_interval_in_seconds = 120
+  }
+
+  kustomizations {
+    name                       = "infrastructure"
+    path                       = "./infrastructure"
+    sync_interval_in_seconds   = 120
+    garbage_collection_enabled = true
+  }
+
+  kustomizations {
+    name                       = "apps"
+    path                       = "./apps"
+    depends_on                 = ["infrastructure"]
+    sync_interval_in_seconds   = 120
+    garbage_collection_enabled = true
+  }
+
+  depends_on = [azurerm_kubernetes_cluster_extension.flux]
+}
