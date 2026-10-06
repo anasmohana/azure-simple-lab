@@ -6,7 +6,7 @@ A small, low-cost Azure lab that demonstrates the delivery pattern I use in prod
 
 ```
 PR ──► fmt / validate / checkov
-manual dispatch per layer ──► plan ──► approval (environment gate) ──► apply that exact plan
+manual dispatch per layer ──► plan ──► approval (issue comment) ──► apply that exact plan
                                   │ GitHub OIDC federated credential, no stored Azure secrets
                                   ▼
                             Azure subscription
@@ -23,7 +23,7 @@ manual dispatch per layer ──► plan ──► approval (environment gate) �
 | 5 `aks-bootstrap` | federated workload identities + Key Vault RBAC for pods | code only (`enabled=false`) | code only |
 
 Only `dev` is deployed, to keep the lab cheap. `prd` has the same code with different inputs
-(address space, GRS storage, purge protection, larger AKS minimums) and sits behind its own approval gate.
+(address space, GRS storage, purge protection, larger AKS minimums) and goes through the same approval gate.
 Code-only layers still plan cleanly (`No changes`), and `aks` / `runner` were plan-tested with
 `enabled=true` (3 resources each) without applying.
 
@@ -55,7 +55,7 @@ terraform/design-aks.md      AKS design decisions
 - **Authentication:** GitHub issues a short-lived OIDC token per job. Azure trusts only the exact
   repo + environment subject (`<env>-plan` for plans, `<env>` for applies), so a plan token cannot be
   replayed as an apply. No client secrets exist. The only secret is a read-only token for the module repo.
-- **Approval:** the apply job needs `<env>-approval`. `prd-approval` has required reviewers; `dev-approval` does not.
+- **Approval:** after the plan, the pipeline opens a GitHub issue linking the run (the plan is in the job summary) and waits for the repo owner to comment `approve` or `deny`. Nothing is applied until then. GitHub's built-in environment reviewers need a paid plan on private repos, so the lab uses a SHA-pinned approval action; with a paid plan you would use environment reviewers instead.
   Apply uses the saved plan file and the plan job's provider lock file, so it applies exactly what was reviewed.
 - **State:** Azure Storage, versioned with soft delete, Entra auth only (no keys), blob-lease locking,
   one state file per layer per environment. Concurrency groups prevent two applies on one state.
@@ -77,7 +77,7 @@ Prerequisites: an Azure subscription you own, `az`, `gh`, Terraform. Full steps 
 az login
 GITHUB_REPO=<owner>/azure-simple-lab ALERT_EMAIL=you@example.com ./scripts/bootstrap.sh
 gh secret set MODULES_READ_TOKEN --repo <owner>/azure-simple-lab   # read-only token for the modules repo
-# add required reviewers on the prd-approval environment, protect main
+# protect main; each apply waits for you to comment "approve" on the approval issue
 # then: Actions -> azure-bootstrap -> Run workflow -> dev, then azure-network, ...
 ```
 

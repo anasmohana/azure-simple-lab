@@ -6,14 +6,14 @@
 2. `GITHUB_REPO=<owner>/azure-simple-lab ALERT_EMAIL=<email> ./scripts/bootstrap.sh`
    Creates: state resource group + storage account + `tfstate` container; Entra app `lab-github-terraform`
    with one federated credential per GitHub environment; Contributor on the subscription; GitHub
-   environments (`dev`, `dev-plan`, `prd`, `prd-plan`, `dev-approval`, `prd-approval`) and variables.
+   environments (`dev`, `dev-plan`, `prd`, `prd-plan`) and variables.
    The federated subject uses GitHub's immutable IDs (`repo:<owner>@<id>/<repo>@<id>:environment:<env>`).
 3. `gh secret set MODULES_READ_TOKEN` (fine-grained PAT, Contents: read-only, on the modules repo only).
-4. Settings > Environments > `prd-approval`: add required reviewers. Protect `main`.
+4. Protect `main`. Approval needs no setup: each apply opens an issue and waits for the repo owner to comment `approve`.
 
 ## Deploy a layer
 Actions > `azure-<layer>` > Run workflow > environment. The run shows the plan in the job summary,
-waits for approval (auto for dev), then applies that exact plan. Run layers in order.
+waits for you to comment `approve` on the approval issue it opens (both dev and prd), then applies that exact plan. Run layers in order.
 If the plan has no changes the approval and apply jobs are skipped.
 
 ## Plan locally (read-only)
@@ -30,6 +30,7 @@ so always run a real plan before pushing.
 ## Troubleshooting seen while building this
 | Symptom | Cause | Fix |
 |---|---|---|
+| Environment reviewers cannot be set (422 "billing plan") | required reviewers need a paid plan on private repos | issue-based approval action in the template |
 | Run ends in `startup_failure` | caller workflow lacked `permissions: id-token: write` | declare permissions in each `azure-*.yml` |
 | `AADSTS700213 no matching federated identity` | token subject uses immutable IDs, credential used names | use the ID-based subject (bootstrap.sh does) |
 | `403 Write access to repository not granted` on module download | `MODULES_READ_TOKEN` scoped to wrong repo / missing Contents read | regenerate the PAT for the modules repo |

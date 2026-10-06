@@ -111,11 +111,22 @@ jobs:
     name: Terraform apply approve
     runs-on: ubuntu-latest
     needs: terraform-plan
-    # Required reviewers are configured on <env>-approval (prd), none on dev
-    environment: ${{ inputs.environment }}-approval
     if: needs.terraform-plan.outputs.changes != '0'
+    permissions:
+      issues: write   # the approval action opens an issue and waits for a comment
+      contents: read
     steps:
-      - run: echo "Apply approved for ${{ inputs.layer }} / ${{ inputs.environment }}"
+      # GitHub environment reviewers need a paid plan for private repos. This gate works on any plan:
+      # the job opens an issue linking this run (the plan is in the job summary) and waits for
+      # the named approver to comment "approve" (or "deny"). Pinned to a commit SHA (v1.13.1).
+      - uses: trstringer/manual-approval@fa642940caf8412403569b28b2db4a1df08a83a3
+        with:
+          secret: ${{ github.token }}
+          approvers: ${{ github.repository_owner }}
+          minimum-approvals: 1
+          exclude-workflow-initiator-as-approver: false
+          issue-title: "Approve apply: ${{ inputs.layer }} / ${{ inputs.environment }}"
+          issue-body: "Review the plan in the job summary of ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}, then comment `approve` to apply or `deny` to stop."
 
   terraform-apply:
     name: Terraform Apply

@@ -62,7 +62,6 @@ az role assignment create --assignee "$APP_ID" --role "Role Based Access Control
   --scope "$RBAC_SCOPE" --condition "$COND" --condition-version 2.0 -o none || true
 
 echo "==> GitHub environments + variables"
-for E in dev-approval prd-approval; do gh api -X PUT "repos/$GITHUB_REPO/environments/$E" -i >/dev/null; done  # approval gates only, no Azure access
 for E in dev dev-plan prd prd-plan; do
   gh api -X PUT "repos/$GITHUB_REPO/environments/$E" -i >/dev/null
   gh variable set AZURE_CLIENT_ID       --env "$E" --repo "$GITHUB_REPO" --body "$APP_ID"
@@ -78,6 +77,7 @@ cat <<MSG
 Done. Manual steps left:
   1. Repo secret MODULES_READ_TOKEN: fine-grained PAT with read-only 'Contents' on anasmohana/terraform-modules
        gh secret set MODULES_READ_TOKEN --repo $GITHUB_REPO
-  2. GitHub > Settings > Environments > prd-approval: add 'Required reviewers' (the approval gate before any prd apply).
+  2. Approval gate: the workflows open an issue and wait for the repo owner to comment 'approve'.
+     (GitHub environment reviewers need a paid plan on private repos; if you have one, you can add them instead.)
   3. Protect 'main' (PR + status checks required).
 MSG
