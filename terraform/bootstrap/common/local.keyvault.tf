@@ -13,6 +13,10 @@ locals {
       network = {
         bypass         = "AzureServices"
         default_action = "Deny"
+        # Subnet ID is derived from the naming convention (the network layer owns the subnet)
+        subnets = var.allow_aks_subnet ? [
+          "/subscriptions/${data.azurerm_client_config.current.subscription_id}/resourceGroups/${local.network_rg_name}/providers/Microsoft.Network/virtualNetworks/${local.vnet_name}/subnets/${local.name_prefix}-aks-snet"
+        ] : []
       }
       tags = local.tags
     }

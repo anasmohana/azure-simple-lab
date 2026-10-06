@@ -4,6 +4,7 @@ module "bootstrap" {
   environment      = "dev"
   alert_email      = var.alert_email
   purge_protection = false
+  allow_aks_subnet = true
 
   tags = {
     project = "azure-simple-lab"
