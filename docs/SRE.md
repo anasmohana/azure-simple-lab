@@ -5,7 +5,10 @@
 - Key Vault audit logs and storage metrics sent to Log Analytics via diagnostic settings.
 - Action group (email) and a metric alert: storage availability below 99% over 15 min (severity 2).
 
-## Design for AKS / production (not deployed)
+## Kubernetes and production design
+Deployed on the dev cluster: Container Insights (logs and metrics to the same Log Analytics workspace) and the Flux
+status visible through the Azure API. Not deployed, design only: the items below.
+
 - **Metrics:** Azure Managed Prometheus + Managed Grafana (or kube-prometheus-stack). **Logs:** Container Insights / Log Analytics.
 - **SLOs:** for example API availability 99.9% over 30 days and p95 latency < 300 ms. Alert on
   error-budget burn rate (fast: 14.4x over 1h; slow: 6x over 6h), not on raw CPU.
