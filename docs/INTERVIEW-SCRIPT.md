@@ -10,6 +10,12 @@ Opening line: "This is a lab I implemented myself to show the same patterns I us
 | 20-25 | Kubernetes / security / monitoring | `terraform/aks/common/local.aks.tf`, `k8s/`, `docs/SRE.md` | "Not running: no reason to pay for an idle cluster. This is the design I would deploy." Entra RBAC, workload identity, NetworkPolicy, PDB/HPA, upgrades, SLO burn-rate alerts, backup/DR |
 | 25-30 | Consultant close | `docs/REVIEW-FINDINGS.md` | the three findings with severity, quick win and long-term fix; how I audit an environment; questions |
 
+## Least-privilege demo (RBAC + workload identity)
+1. Pipeline identity: Contributor cannot write role assignments; show the 403 from the first `aks-bootstrap` run.
+2. Fix: RBAC Administrator with a condition that allows assigning only Key Vault Secrets User (`scripts/bootstrap.sh`).
+3. `aks-bootstrap` then creates a federated user-assigned identity for the `website` service account and grants it that
+   one role on the Key Vault. The pod reads secrets with no stored credential, and CI can never grant broader rights.
+
 ## Be ready for
 - **"Why not private endpoints / a running AKS in the lab?"** Cost and demo risk; the network layer, private DNS
   and the aks/runner layers show the design and I plan-tested them (`enabled=true` gives 3 resources each).

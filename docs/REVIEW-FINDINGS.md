@@ -11,7 +11,7 @@ Three findings in the format I use for client reports: severity, risk, remediati
   (the `runner` layer) so pipelines can still reach them.
 
 ## 2. Pipeline identity is over-privileged: **High**
-- **What:** one pipeline identity has Contributor on the whole subscription and is used for both environments.
+- **What:** one pipeline identity has Contributor on the whole subscription and is used for both environments. It also has RBAC Administrator limited by a condition to one role (Key Vault Secrets User), which is the right pattern but should be scoped to resource groups.
 - **Risk:** a compromised workflow or approver can change anything in the subscription; dev and prd share a blast radius.
 - **Quick win:** scope the role to the lab resource groups, require CODEOWNERS review on `terraform/` and `.github/`,
   make checkov blocking instead of report-only.

@@ -48,10 +48,18 @@ for E in dev-plan prd-plan dev prd; do
     \"audiences\": [\"api://AzureADTokenExchange\"]}" -o none 2>/dev/null || true
 done
 
-echo "==> RBAC: Contributor (+ RBAC admin limited) on subscription, blob owner on state"
+echo "==> RBAC: Contributor, conditional RBAC Administrator (Key Vault Secrets User only), blob owner on state"
 az role assignment create --assignee "$APP_ID" --role Contributor --scope "/subscriptions/$SUB_ID" -o none || true
-# Needed because the stack assigns no roles today; remove if never required. Kept narrow on purpose.
 az role assignment create --assignee "$APP_ID" --role "Storage Blob Data Owner" --scope "$SA_ID" -o none || true
+
+# Contributor cannot create role assignments, and the aks-bootstrap layer must give each pod's identity
+# access to Key Vault. Give the pipeline identity RBAC Administrator, but with an ABAC condition so it can
+# only assign (or remove) the single role "Key Vault Secrets User". It cannot grant Owner/Contributor.
+KVSU=4633458b-17de-408a-b874-0445c86b69e6
+COND="((!(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$KVSU})) AND ((!(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$KVSU}))"
+RBAC_SCOPE="${RBAC_SCOPE:-/subscriptions/$SUB_ID}"   # tighten to a resource group once it exists
+az role assignment create --assignee "$APP_ID" --role "Role Based Access Control Administrator" \
+  --scope "$RBAC_SCOPE" --condition "$COND" --condition-version 2.0 -o none || true
 
 echo "==> GitHub environments + variables"
 for E in dev-approval prd-approval; do gh api -X PUT "repos/$GITHUB_REPO/environments/$E" -i >/dev/null; done  # approval gates only, no Azure access

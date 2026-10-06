@@ -36,6 +36,7 @@ so always run a real plan before pushing.
 | `Unsupported attribute enable_monitor_diagnostic_setting` | module requires keys that `validate` cannot see | add the key; plan locally first |
 | `RequestDisallowedByAzure ... location not accepting new customers` | region closed for the subscription | use another region (norwayeast) |
 | AKS `dns_prefix` / `dns_prefix_private_cluster` conflict | module sets `dns_prefix` by default | use `dns_prefix` only |
+| `AuthorizationFailed ... roleAssignments/write` in aks-bootstrap | Contributor cannot create role assignments | conditional RBAC Administrator (Key Vault Secrets User only), see bootstrap.sh |
 | `-var enabled=true` rejected | root did not declare the variable | roots now declare `enabled` |
 
 ## Teardown
